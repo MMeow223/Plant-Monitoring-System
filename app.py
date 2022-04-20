@@ -139,12 +139,6 @@ def dashboard():
         moistureArray.append(row[3])
         humidityArray.append(row[4])
         temperatureArray.append(row[5])
-        # print(row)
-
-    # print(footcandleArray)
-    # print(humidityArray)
-    # print(temperatureArray)
-    # print(monitoringResult)
 
     return render_template('dashboard.html', lightOnResult=lightOnResult, lightOffResult=lightOffResult, fanOnResult=fanOnResult, fanOffResult=fanOffResult, footcandleArray=footcandleArray, humidityArray=humidityArray, temperatureArray=temperatureArray, moistureArray=moistureArray, pumpOnResult=pumpOnResult, pumpOffResult=pumpOffResult)
 
@@ -180,10 +174,9 @@ def control_actions(action):
 def save_data_to_database(mycursor):
 
     while 1:
-        # print("Looking for data from arduino...")
         line = ser.readline().decode('utf-8').rstrip()
         ser.reset_input_buffer()
-        # line = "asd"
+
         print("Line = " + line)
         # separate the string into list
         x = line.split("|")
@@ -199,10 +192,6 @@ def save_data_to_database(mycursor):
                 fanstatus = bool(0 if (x[5] == '1') else 1)
                 pumpstatus = bool(x[6])
 
-                # print(humidity, temperature, footcandle,moisture, lampstatus, fanstatus, pumpstatus)
-
-                # with mydb:
-                # print("ready to execute")
                 mycursor.execute(
                     "INSERT INTO monitoring_data (`id`,`timestamp`,`footcandle`,`moisture`,`humidity`,`temperature`) VALUES (NULL,DEFAULT,{0},{1},{2},{3})".format(footcandle, moisture, humidity, temperature))
 
@@ -217,12 +206,7 @@ def save_data_to_database(mycursor):
 
                 mydb.commit()
 
-                # print("Upload to database...")
-
-                # mycursor.close()
-
             except:
-                # print databaes error
                 print("Error")
         time.sleep(10)
 
