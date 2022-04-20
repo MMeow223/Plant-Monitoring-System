@@ -7,15 +7,21 @@
 #define USED_PIN A0                                   // analog pin connected to the light sensor
 #define USED_PHOTOCELL LightDependentResistor::GL5516 // Photocell used
 
+// pins controlling relay
 const int lampToRelayPin = 3;
 const int fanToRelayPin = 4;
 const int pumpToRelayPin = 5;
+
+// parameter for toggling different relays
 const float footcandleLampOn = 4;
 const int hotTemperature = 30;
 const int moistSoil = 20;
-const int AirValue = 540;   // you need to replace this value with Value_1
-const int WaterValue = 327; // you need to replace this value with Value_2
 
+// calibrate the soil moisture sensor
+const int AirValue = 540;
+const int WaterValue = 327;
+
+// initial soil moisture values
 int soilMoistureValue = 0;
 int soilmoisturepercent = 0;
 
@@ -26,8 +32,10 @@ LightDependentResistor photocell(USED_PIN,
                                  10,  // Default ADC resolution
                                  10); // Default linear smooth (if used)
 
+// Create a DHT instance
 DHT dht(DHTPIN, DHTTYPE);
 
+// default setting of different parts
 boolean watering = false;
 boolean lampOn = false;
 boolean fanOn = false;
@@ -44,10 +52,10 @@ void setup()
   pinMode(lampToRelayPin, OUTPUT);
   pinMode(fanToRelayPin, OUTPUT);
   pinMode(pumpToRelayPin, OUTPUT);
+
   photocell.setPhotocellPositionOnGround(false);
 
   Serial.begin(9600);
-  //  Serial.println(F("DHTxx test!"));
 
   dht.begin();
 }
@@ -57,9 +65,10 @@ void loop()
 
   delay(2000);
 
-  soilMoistureValue = analogRead(A1); // put Sensor insert into soil
-  soilmoisturepercent = map(soilMoistureValue, AirValue, WaterValue, 0, 100);
+  soilMoistureValue = analogRead(A1);                                         // get reading from soil moisture sensor
+  soilmoisturepercent = map(soilMoistureValue, AirValue, WaterValue, 0, 100); // map the value to percentage
 
+  // get incoming data and get perform actions
   int incomingAction = Serial.parseInt();
 
   switch (incomingAction)
@@ -111,6 +120,8 @@ void loop()
 
   // Converting the reading from LDR to footcandle
   float footcandle = LightDependentResistor::luxToFootCandles(photocell.getCurrentLux());
+
+  // Read temperature and humidity from DHT sensor
   float h = dht.readHumidity();
   float t = dht.readTemperature();
 
@@ -121,19 +132,7 @@ void loop()
     return;
   }
 
-  // Compute heat index in Celsius (isFahreheit = false)
-  float hic = dht.computeHeatIndex(t, h, false);
-
-  // Serial.print(F(" Humidity: "));
-  // Serial.print(h);
-  // Serial.print(F("%  Temperature: "));
-  // Serial.print(t);
-  // Serial.print(F("C "));
-  // Serial.print(hic);
-  // Serial.print(F("C "));
-  // Serial.print("FootCandle");
-  // Serial.println(footcandle);
-
+  // print to serial monitor to be fetch by the web app
   Serial.print(h);
   Serial.print("|");
   Serial.print(t);
@@ -159,6 +158,7 @@ void loop()
   Serial.print("|");
   Serial.println(digitalRead(pumpToRelayPin));
 
+  // turn the lamp on if the intended light intensity is achieved
   if (autoLampOn == true)
   {
     if (footcandle < footcandleLampOn)
@@ -171,6 +171,7 @@ void loop()
     }
   }
 
+  // turn the fan on if the temperature is above the threshold
   if (autoFanOn == true)
   {
     if (t > hotTemperature)
@@ -183,6 +184,7 @@ void loop()
     }
   }
 
+  // turn the pump on for 0.7 second if the soil is dry
   if (autoPumpOn == true)
   {
     if (soilmoisturepercent < moistSoil)
