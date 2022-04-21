@@ -7,8 +7,69 @@
         </svg>
     </button>
 <div class="container p-5">
-
     <h1>Dashboard</h1>
+    <div class="row p-3">
+        <div class="col card text-center m-2">
+            <div class="card-head">
+                <h2>Current Humidity</h2>
+            </div>
+            <div class="card-body">
+                <h1 id="humidity-display">{{humidity}}%</h1>
+            </div>
+        </div>
+        <div class="col card text-center m-2">
+            <div class="card-head">
+                <h2>Current Temperature</h2>
+            </div>
+            <div class="card-body">
+                <h1 id="temperature-display">{{temperature}} *C</h1>
+            </div>
+        </div>
+        <div class="col card text-center m-2">
+            <div class="card-head">
+                <h2>Current Soil Moisture</h2>
+            </div>
+            <div class="card-body">
+                <h1 id="moisture-display">{{moisture}}%</h1>
+            </div>
+        </div>
+        <div class="col card text-center m-2">
+            <div class="card-head">
+                <h2>Current Light Intensity</h2>
+            </div>
+            <div class="card-body">
+                <h1 id="footcandle-display">{{footcandle}}fc</h1>
+            </div>
+        </div>
+
+
+
+    </div>
+
+    <div class="row  text-center m-2">
+        <a id="lampstatus-title-container" href="/action/toggle_lamp" class="col card m-2 p-3 text-decoration-none text-black {% if lampstatus == '1' %} bg-success {% else %} bg-danger {% endif %}">
+            <h4 id="lampstatus-title">Lamp {% if lampstatus == '1' %} On {% else %} Off {% endif %}</h4>
+        </a>
+
+
+        <a id="fanstatus-title-container" href="/action/toggle_fan" class="col card m-2 p-3 text-decoration-none text-black {% if fanstatus == '1' %} bg-success {% else %} bg-danger {% endif %}">
+            <h4 id="fanstatus-title">Fan {% if fanstatus == '1' %} On {% else %} Off {% endif %}</h4>
+        </a>
+
+        <a id="autofan-title-container" href="/action/toggle_auto_fan" class="col card m-2 p-3 text-decoration-none text-black {% if autofan == '1' %} bg-success {% else %} bg-danger {% endif %}">
+            <h4 id="autofan-title">Auto Fan {% if autofan == '1' %} On {% else %} Off {% endif %} </h4>
+        </a>
+
+        <a id="autolamp-title-container" href="/action/toggle_auto_lamp" class="col card m-2 p-3 text-decoration-none text-black {% if autolamp == '1' %} bg-success {% else %} bg-danger {% endif %}">
+            <h4 id="autolamp-title">Auto Lamp {% if autolamp == '1' %} On {% else %} Off {% endif %}</h4>
+        </a>
+
+        <a id="autopump-title-container" href="/action/toggle_auto_pump" class="col card m-2 p-3 text-decoration-none text-black {% if autopump == '1' %} bg-success {% else %} bg-danger {% endif %}">
+            <h4 id="autopump-title">Auto Pump {% if autopump == '1' %} On {% else %} Off {% endif %}</h4>
+        </a>
+
+    </div>
+
     <div class="row">
         <div class="col shadow m-2 border border-2">
             <h3 class="text-center">Air Humity and Temperature By Time</h3>
@@ -77,9 +138,9 @@
             }
         }
 
-        var chart = new ApexCharts(document.querySelector("#chart1"), options);
+        var linechart1 = new ApexCharts(document.querySelector("#chart1"), options);
 
-        chart.render();
+        linechart1.render();
     </script>
     <script>
         var footcandleArray = '{{footcandleArray}}';
@@ -104,9 +165,9 @@
             }
         }
 
-        var chart = new ApexCharts(document.querySelector("#chart2"), options);
+        var linechart2 = new ApexCharts(document.querySelector("#chart2"), options);
 
-        chart.render();
+        linechart2.render();
     </script>
     <script>
         var moistureArray = '{{moistureArray}}';
@@ -120,7 +181,8 @@
         console.log(moistureArray)
         var options = {
             chart: {
-                type: 'line'
+                type: 'line',
+                height: 350,
             },
             series: [{
                 name: '%',
@@ -131,9 +193,9 @@
             }
         }
 
-        var chart = new ApexCharts(document.querySelector("#chart3"), options);
+        var linechart3 = new ApexCharts(document.querySelector("#chart3"), options);
 
-        chart.render();
+        linechart3.render();
     </script>
 
     <script>
@@ -161,8 +223,8 @@
             }]
         };
 
-        var chart = new ApexCharts(document.querySelector("#chart4"), options);
-        chart.render();
+        var piechart1 = new ApexCharts(document.querySelector("#chart4"), options);
+        piechart1.render();
     </script>
     <script>
         var fanOnResult = parseInt('{{fanOnResult[0][0]}}');
@@ -189,8 +251,57 @@
             }]
         };
 
-        var chart = new ApexCharts(document.querySelector("#chart5"), options);
-        chart.render();
+        var piechart2 = new ApexCharts(document.querySelector("#chart5"), options);
+        piechart2.render();
+    </script>
+
+    <script>
+        function requestData() {
+            var request = $.get('/api/get-data');
+
+            var realtimeinsert = request.done(function(result) {
+
+
+                $('#humidity-display').html(result[0] + ' %');
+                $('#temperature-display').html(result[1] + ' *c');
+                $('#footcandle-display').html(result[2] + ' fc');
+                $('#moisture-display').html(result[3] + ' %');
+
+
+                // creat an array with all those title
+                var ids = ['#lampstatus-title', '#fanstatus-title', '#autolamp-title', '#autofan-title', '#autopump-title'];
+                var description = ['Lamp', 'Fan', 'Auto Lamp', 'Auto Fan', 'Auto Pump'];
+
+
+                // loop through the array
+                for (var i = 0; i < ids.length; i++) {
+                    $(ids[i] + "-container").removeClass('bg-danger');
+                    $(ids[i] + "-container").removeClass('bg-success');
+                    $(ids[i]).html(function() {
+                        if (result[4 + i] == 1) {
+                            return description[i] + ' On';
+                        } else {
+                            return description[i] + ' Off';
+                        }
+                    });
+                    $(ids[i] + "-container").addClass(function() {
+                        if (result[4 + i] == 1) {
+                            return 'bg-success';
+                        } else {
+                            return 'bg-danger';
+                        }
+                    });
+
+                }
+            });
+        }
+        $(document).ready(function() {
+
+            //requestData();
+            //console.log(request);
+
+            setInterval(requestData, 1000);
+        });
     </script>
 
 
@@ -200,61 +311,93 @@
             <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body">
+            <fieldset>
+                <legend>Setting Parameters</legend>
+                <div class="form-group">
+                    <form action="/setting" method="post">
+                        <div class="form-group">
+                            <label for="preferredTemperature">Preferred Temperature Below (*C)</label>
+                            <input type="number" class="form-control" id="preferredTemperature" placeholder="30 (default)" name="preferredTemperature">
+                        </div>
+                        <div class="form-group">
+                            <label for="preferredMoisture">Preferred Soil Moisture (%)</label>
+                            <input type="number" class="form-control" id="preferredMoisture" placeholder="50 (default)" name="preferredMoisture">
+                        </div>
+                        <div class="form-group">
+                            <label for="preferredLight">Preferred Light Intensity (fc)</label>
+                            <input type="number" class="form-control" id="preferredLight" placeholder="4 (default)" name="preferredLight">
+                        </div>
+                        <div class="form-group">
+                            <label for="preferredPump">Each Water Pump Toggle Duration (s)</label>
+                            <input type="number" class="form-control" id="preferredPump" placeholder="1 (default)" name="preferredPump">
+                        </div>
+                        <button type="submit" class="btn btn-primary m-2">Submit</button>
+                    </form>
+                </div>
+            </fieldset>
+            <fieldset class="mt-5">
+                <legend>Setting Parameters</legend>
+                <div class="form-group">
 
-            <a href="/action/water_plant" class="text-decoration-none m-2">
-                <div class="text-white fs-2  rounded my-auto text-center p-5 m-3 shadow" style="
+                    <a href="/action/water_plant" class="text-decoration-none m-2">
+                        <div class="text-white fs-2  rounded my-auto text-center p-5 m-3 shadow" style="
                     background-image: url('http://thisismygarden.com/wp-content/uploads/2018/05/Watering-the-garden.jpg');
                     background-repeat: no-repeat;
                     background-size: auto;">
-                    <p class="" style="text-shadow: 2px 2px 3px black;">Watering Plant</p>
-                </div>
-            </a>
-            <a href="/action/toggle_lamp" class="text-decoration-none m-2">
-                <div class="text-white fs-2  rounded my-auto text-center p-5 m-3 shadow" style="
+                            <p class="" style="text-shadow: 2px 2px 3px black;">Watering Plant</p>
+                        </div>
+                    </a>
+                    <a href="/action/toggle_lamp" class="text-decoration-none m-2">
+                        <div class="text-white fs-2  rounded my-auto text-center p-5 m-3 shadow" style="
                     background-image: url('https://cdn.bodanius.com/media/1/3QB138456_5W-Full-Spectrum-USB-LED-Lamp-Plant-Growing_400x.png');
                     background-repeat: no-repeat;
                     background-size: auto;">
-                    <p class="" style="text-shadow: 2px 2px 3px black;">Toggle Lamp</p>
-                </div>
-            </a>
+                            <p class="" style="text-shadow: 2px 2px 3px black;">Toggle Lamp</p>
+                        </div>
+                    </a>
 
-            <a href="/action/toggle_fan" class="text-decoration-none m-2">
-                <div class="text-white fs-2  rounded my-auto text-center p-5 m-3  shadow" style="
+                    <a href="/action/toggle_fan" class="text-decoration-none m-2">
+                        <div class="text-white fs-2  rounded my-auto text-center p-5 m-3  shadow" style="
                     background-image: url('https://5.imimg.com/data5/SELLER/Default/2021/9/CT/IC/JO/14170417/greenhouse-air-circulation-fan-500x500.JPG');
                     background-repeat: no-repeat;
                     background-size: auto;">
-                    <p class="" style="text-shadow: 2px 2px 3px black;">Toggle Fan</p>
-                </div>
-            </a>
-            <a href="/action/toggle_auto_fan" class="text-decoration-none m-2">
-                <div class="text-white fs-2  rounded my-auto text-center p-5 m-3  shadow" style="
+                            <p class="" style="text-shadow: 2px 2px 3px black;">Toggle Fan</p>
+                        </div>
+                    </a>
+                    <a href="/action/toggle_auto_fan" class="text-decoration-none m-2">
+                        <div class="text-white fs-2  rounded my-auto text-center p-5 m-3  shadow" style="
                     background-image: url('https://hvls.ae/wp-content/uploads/2016/09/Pivot-Farm-Fans-6-BLADES-2.png');
                     background-repeat: no-repeat;
                     background-size: auto;">
-                    <p class="" style="text-shadow: 2px 2px 3px black;">Toggle Auto Fan</p>
-                </div>
-            </a>
-            <a href="/action/toggle_auto_lamp" class="text-decoration-none m-2">
-                <div class="text-white fs-2  rounded my-auto text-center p-5 m-3  shadow" style="
+                            <p class="" style="text-shadow: 2px 2px 3px black;">Toggle Auto Fan</p>
+                        </div>
+                    </a>
+                    <a href="/action/toggle_auto_lamp" class="text-decoration-none m-2">
+                        <div class="text-white fs-2  rounded my-auto text-center p-5 m-3  shadow" style="
                     background-image: url('https://www.idlights.com/wp-content/uploads/2017/12/XKBZRU.jpg');
                     background-repeat: no-repeat;
                     background-size: auto;">
-                    <p class="" style="text-shadow: 2px 2px 3px black;">Toggle Auto Lamp</p>
-                </div>
-            </a>
-            <a href="/action/toggle_auto_pump" class="text-decoration-none m-2">
-                <div class="text-white fs-2  rounded my-auto text-center p-5 m-3  shadow" style="
+                            <p class="" style="text-shadow: 2px 2px 3px black;">Toggle Auto Lamp</p>
+                        </div>
+                    </a>
+                    <a href="/action/toggle_auto_pump" class="text-decoration-none m-2">
+                        <div class="text-white fs-2  rounded my-auto text-center p-5 m-3  shadow" style="
                     background-image: url('https://nerdtechy.com/wp-content/uploads/2020/10/Instapark-Automatic-Watering-System-3.jpg');
                     background-repeat: no-repeat;
                     background-size: auto;">
-                    <p class="" style="text-shadow: 2px 2px 3px black;">Toggle Auto Watering</p>
+                            <p class="" style="text-shadow: 2px 2px 3px black;">Toggle Auto Watering</p>
+                        </div>
+                    </a>
+                    <!-- create a form -->
+
+                    <a href="/action/reset" class="text-decoration-none m-2 ">
+                        <div class="text-white fs-2  rounded my-auto text-center p- m-5 shadow bg-primary">
+                            <p class="">Reset Default</p>
+                        </div>
+                    </a>
+
                 </div>
-            </a>
-            <a href="/action/reset" class="text-decoration-none m-2 ">
-                <div class="text-white fs-2  rounded my-auto text-center p- m-5 shadow bg-primary">
-                    <p class="">Reset Default</p>
-                </div>
-            </a>
+            </fieldset>
 
         </div>
     </div>

@@ -1,8 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, make_response, render_template, request, redirect, url_for, flash, jsonify
 import mysql.connector
 import serial
 import threading
 import time
+import json
+
 app = Flask(__name__)
 
 mydb = mysql.connector.connect(
@@ -13,6 +15,16 @@ mydb = mysql.connector.connect(
 )
 
 thread_started = False
+humidity = ""
+temperature = ""
+footcandle = ""
+moisture = ""
+lampstatus = ""
+fanstatus = ""
+pumpstatus = ""
+autolamp = True
+autofan = True
+autopump = True
 
 
 @app.route('/')
@@ -98,6 +110,17 @@ def pump_operation():
 @app.route('/dashboard')
 def dashboard():
     global thread_started
+    global humidity
+    global temperature
+    global footcandle
+    global moisture
+    global lampstatus
+    global fanstatus
+    global pumpstatus
+    global autolamp
+    global autofan
+    global autopump
+
     mycursor = mydb.cursor()
 
     if(thread_started == False):
@@ -129,6 +152,24 @@ def dashboard():
         "SELECT * FROM monitoring_data WHERE DATE(timestamp) = CURDATE() ORDER BY `id` DESC LIMIT 24 ")
     monitoringResult = mycursor.fetchall()
 
+    # set default value of 0 to the variable below
+
+    line = ser.readline().decode('utf-8').rstrip()
+    ser.reset_input_buffer()
+    x = line.split("|")
+
+    if(len(x) == 10):
+        humidity = x[0]
+        temperature = x[1]
+        footcandle = x[2]
+        moisture = x[3]
+        lampstatus = 0 if (x[4] == '1') else 1
+        fanstatus = 0 if (x[5] == '1') else 1
+        pumpstatus = x[6]
+        autolamp = x[7]
+        autofan = x[8]
+        autopump = x[9]
+
     footcandleArray = []
     humidityArray = []
     moistureArray = []
@@ -140,33 +181,141 @@ def dashboard():
         humidityArray.append(row[4])
         temperatureArray.append(row[5])
 
-    return render_template('dashboard.html', lightOnResult=lightOnResult, lightOffResult=lightOffResult, fanOnResult=fanOnResult, fanOffResult=fanOffResult, footcandleArray=footcandleArray, humidityArray=humidityArray, temperatureArray=temperatureArray, moistureArray=moistureArray, pumpOnResult=pumpOnResult, pumpOffResult=pumpOffResult)
+    templateData = {
+        'lightOnResult': lightOnResult,
+        'lightOffResult': lightOffResult,
+        'fanOnResult': fanOnResult,
+        'fanOffResult': fanOffResult,
+
+        'pumpOnResult': pumpOnResult,
+        'pumpOffResult': pumpOffResult,
+
+        'footcandleArray': footcandleArray,
+        'humidityArray': humidityArray,
+        'moistureArray': moistureArray,
+        'temperatureArray': temperatureArray,
+
+        'humidity': humidity,
+        'moisture': moisture,
+        'temperature': temperature,
+        'footcandle': footcandle,
+        'lampstatus': lampstatus,
+        'fanstatus': fanstatus,
+        'pumpstatus': pumpstatus,
+
+        'autolamp': autolamp,
+        'autofan': autofan,
+        'autopump': autopump,
+
+    }
+    return render_template('dashboard.html', **templateData)
+    # return render_template('dashboard.html', lightOnResult=lightOnResult, lightOffResult=lightOffResult, fanOnResult=fanOnResult, fanOffResult=fanOffResult, footcandleArray=footcandleArray, humidityArray=humidityArray, temperatureArray=temperatureArray, moistureArray=moistureArray, pumpOnResult=pumpOnResult, pumpOffResult=pumpOffResult)
 
 
-@app.route('/action/<action>')
+@app.route('/api/get-data', methods=['POST', 'GET'])
+def get_data():
+    global thread_started
+    global humidity
+    global temperature
+    global footcandle
+    global moisture
+    global lampstatus
+    global fanstatus
+    global pumpstatus
+    global autolamp
+    global autofan
+    global autopump
+
+    mycursor = mydb.cursor()
+
+    if(thread_started == False):
+        thread_started = True
+        thread2 = threading.Thread(
+            target=save_data_to_database, args=(mycursor,))
+
+        thread2.start()
+
+    # set default value of 0 to the variable below
+    line = ser.readline().decode('utf-8').rstrip()
+    ser.reset_input_buffer()
+    x = line.split("|")
+
+    if(len(x) == 10):
+        humidity = x[0]
+        temperature = x[1]
+        footcandle = x[2]
+        moisture = x[3]
+        lampstatus = 0 if (x[4] == '1') else 1
+        fanstatus = 0 if (x[5] == '1') else 1
+        pumpstatus = x[6]
+        autolamp = x[7]
+        autofan = x[8]
+        autopump = x[9]
+
+    data = [humidity, temperature, footcandle, moisture, lampstatus,
+            fanstatus, autolamp, autofan, autopump]
+
+    response = make_response(json.dumps(data))
+    response.content_type = 'application/json'
+
+    return response
+
+
+@ app.route('/action/<action>')
 def control_actions(action):
 
     if action == "water_plant":
-        print("Watering plant...")
-        ser.write(b"1")
+        ser.write("1001".encode())
     if action == "toggle_lamp":
-        print("Toggling lamp...")
-        ser.write(b'2')
+        ser.write('1002'.encode())
     if action == "toggle_fan":
-        print("Toggling fan...")
-        ser.write(b'3')
+        ser.write('1003'.encode())
     if action == "toggle_auto_lamp":
-        print("Toggling auto lamp...")
-        ser.write(b'4')
+        ser.write('1004'.encode())
     if action == "toggle_auto_fan":
-        print("Toggling auto fan...")
-        ser.write(b'5')
+        ser.write('1005'.encode())
     if action == "toggle_auto_pump":
-        print("Toggling auto pump...")
-        ser.write(b'6')
+        ser.write('1006'.encode())
     if action == "reset":
-        print("Reset...")
-        ser.write(b'7')
+        ser.write('1007'.encode())
+
+    # return dashboard()
+
+    return redirect('/dashboard')
+
+
+@ app.route('/setting', methods=['POST'])
+def setting():
+    preferredLight = request.form.get('preferredLight')
+    preferredTemperature = request.form.get(
+        'preferredTemperature')
+    preferredMoisture = request.form.get('preferredMoisture')
+    preferredPump = request.form.get('preferredPump')
+
+    # put those value into array
+    temparray = [preferredLight, preferredTemperature,
+                 preferredMoisture, preferredPump]
+    default = [4, 30, 50, 1]
+
+    for i in range(len(temparray)):
+        if temparray[i] == "":
+            temparray[i] = default[i]
+            # convert the value to string
+        temparray[i] = str(temparray[i])
+        # check how many character is in the string
+        while len(temparray[i]) < 3:
+            temparray[i] = "0" + temparray[i]
+
+        # print(temparray[i])
+    # print(preferredTemperature)
+    # print(preferredMoisture)
+    # print(preferredLight)
+
+    print("20"+temparray[0]+temparray[1] +
+          temparray[2]+temparray[3])
+
+    ser.write(("20"+temparray[0]+temparray[1] +
+              temparray[2]+temparray[3]).encode())
 
     return redirect('/dashboard')
 
@@ -174,9 +323,10 @@ def control_actions(action):
 def save_data_to_database(mycursor):
 
     while 1:
+        # print("Looking for data from arduino...")
         line = ser.readline().decode('utf-8').rstrip()
         ser.reset_input_buffer()
-
+        # line = "asd"
         print("Line = " + line)
         # separate the string into list
         x = line.split("|")
@@ -192,6 +342,10 @@ def save_data_to_database(mycursor):
                 fanstatus = bool(0 if (x[5] == '1') else 1)
                 pumpstatus = bool(x[6])
 
+                # print(humidity, temperature, footcandle,moisture, lampstatus, fanstatus, pumpstatus)
+
+                # with mydb:
+                # print("ready to execute")
                 mycursor.execute(
                     "INSERT INTO monitoring_data (`id`,`timestamp`,`footcandle`,`moisture`,`humidity`,`temperature`) VALUES (NULL,DEFAULT,{0},{1},{2},{3})".format(footcandle, moisture, humidity, temperature))
 
@@ -206,7 +360,12 @@ def save_data_to_database(mycursor):
 
                 mydb.commit()
 
+                # print("Upload to database...")
+
+                # mycursor.close()
+
             except:
+                # print databaes error
                 print("Error")
         time.sleep(10)
 
