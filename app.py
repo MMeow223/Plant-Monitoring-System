@@ -1,4 +1,5 @@
-from flask import Flask, make_response, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, make_response, render_template, request, redirect
+from mysql.connector import Error
 import mysql.connector
 import serial
 import threading
@@ -13,6 +14,10 @@ mydb = mysql.connector.connect(
     password="",
     database="plant_monitoring_system"
 )
+mydb.reconnect()
+mycursor = mydb.cursor()
+mycursor.execute('set global max_allowed_packet=67108864')
+mycursor.close()
 
 thread_started = False
 humidity = ""
@@ -27,89 +32,111 @@ autofan = True
 autopump = True
 
 
-@app.route('/')
-def index():
+def thread_start():
     global thread_started
-    mycursor = mydb.cursor()
 
     if(thread_started == False):
+        # mycursor = mydb.cursor()
         thread_started = True
-        # ser = serial.Serial('COM3', 9600, timeout=1)
         thread2 = threading.Thread(
-            target=save_data_to_database, args=(mycursor,))
-
+            target=save_data_to_database, args=())
         thread2.start()
 
+
+@app.route('/')
+def index():
+    # global thread_started
+    # mycursor = mydb.cursor()
+
+    # if(thread_started == False):
+    #     thread_started = True
+    #     # ser = serial.Serial('COM3', 9600, timeout=1)
+    #     thread2 = threading.Thread(
+    #         target=save_data_to_database, args=(mycursor,))
+
+    #     thread2.start()
+    thread_start()
+    mycursor = mydb.cursor()
     mycursor.execute("SELECT * FROM monitoring_data ORDER BY id DESC")
 
     result = mycursor.fetchall()
+    mycursor.close()
 
     return render_template('index.html', result=result,)
 
 
 @app.route('/fan_operation')
 def fan_operation():
-    global thread_started
+    # global thread_started
+    # mycursor = mydb.cursor()
+
+    # if(thread_started == False):
+    #     thread_started = True
+    #     # ser = serial.Serial('COM3', 9600, timeout=1)
+    #     thread2 = threading.Thread(
+    #         target=save_data_to_database, args=(mycursor,))
+
+    #     thread2.start()
+    thread_start()
+
+    mydb.reconnect()
+
     mycursor = mydb.cursor()
-
-    if(thread_started == False):
-        thread_started = True
-        ser = serial.Serial('COM3', 9600, timeout=1)
-        thread2 = threading.Thread(
-            target=save_data_to_database, args=(mycursor,))
-
-        thread2.start()
-
     mycursor.execute("SELECT * FROM fan_toggle ORDER BY id DESC")
 
     result = mycursor.fetchall()
-
+    mycursor.close()
     return render_template('fan.operation.html', result=result,)
 
 
 @app.route('/lamp_operation')
 def lamp_operation():
-    global thread_started
+    # global thread_started
+    # mycursor = mydb.cursor()
+
+    # if(thread_started == False):
+    #     thread_started = True
+    #     # ser = serial.Serial('COM3', 9600, timeout=1)
+    #     thread2 = threading.Thread(
+    #         target=save_data_to_database, args=(mycursor))
+
+    #     thread2.start()
+    thread_start()
+    mydb.reconnect()
     mycursor = mydb.cursor()
-
-    if(thread_started == False):
-        thread_started = True
-        # ser = serial.Serial('COM3', 9600, timeout=1)
-        thread2 = threading.Thread(
-            target=save_data_to_database, args=(mycursor))
-
-        thread2.start()
-
     mycursor.execute("SELECT * FROM lamp_toggle ORDER BY id DESC")
 
     result = mycursor.fetchall()
-
+    mycursor.close()
     return render_template('lamp.operation.html', result=result,)
 
 
 @app.route('/pump_operation')
 def pump_operation():
-    global thread_started
+    # global thread_started
+    # mycursor = mydb.cursor()
+
+    # if(thread_started == False):
+    #     thread_started = True
+    #     # ser = serial.Serial('COM3', 9600, timeout=1)
+    #     thread2 = threading.Thread(
+    #         target=save_data_to_database, args=(mycursor))
+
+    #     thread2.start()
+    thread_start()
+    mydb.reconnect()
     mycursor = mydb.cursor()
-
-    if(thread_started == False):
-        thread_started = True
-        # ser = serial.Serial('COM3', 9600, timeout=1)
-        thread2 = threading.Thread(
-            target=save_data_to_database, args=(mycursor))
-
-        thread2.start()
-
     mycursor.execute("SELECT * FROM pump_toggle ORDER BY id DESC")
 
     result = mycursor.fetchall()
+    mycursor.close()
 
     return render_template('pump.operation.html', result=result,)
 
 
 @app.route('/dashboard')
 def dashboard():
-    global thread_started
+    # global thread_started
     global humidity
     global temperature
     global footcandle
@@ -121,14 +148,17 @@ def dashboard():
     global autofan
     global autopump
 
+    # mycursor = mydb.cursor()
+
+    # if(thread_started == False):
+    #     thread_started = True
+    #     thread2 = threading.Thread(
+    #         target=save_data_to_database, args=(mycursor,))
+
+    #     thread2.start()
+    thread_start()
+    mydb.reconnect()
     mycursor = mydb.cursor()
-
-    if(thread_started == False):
-        thread_started = True
-        thread2 = threading.Thread(
-            target=save_data_to_database, args=(mycursor,))
-
-        thread2.start()
 
     mycursor.execute("SELECT COUNT(*) FROM lamp_toggle WHERE lamp_status = 1")
     lightOnResult = mycursor.fetchall()
@@ -152,23 +182,26 @@ def dashboard():
         "SELECT * FROM monitoring_data WHERE DATE(timestamp) = CURDATE() ORDER BY `id` DESC LIMIT 24 ")
     monitoringResult = mycursor.fetchall()
 
+    mycursor.close()
+
     # set default value of 0 to the variable below
+    if ser.in_waiting:
 
-    line = ser.readline().decode('utf-8').rstrip()
-    ser.reset_input_buffer()
-    x = line.split("|")
+        line = ser.readline().decode('utf-8').rstrip()
+        ser.reset_input_buffer()
+        x = line.split("|")
 
-    if(len(x) == 10):
-        humidity = x[0]
-        temperature = x[1]
-        footcandle = x[2]
-        moisture = x[3]
-        lampstatus = 0 if (x[4] == '1') else 1
-        fanstatus = 0 if (x[5] == '1') else 1
-        pumpstatus = x[6]
-        autolamp = x[7]
-        autofan = x[8]
-        autopump = x[9]
+        if(len(x) == 10):
+            humidity = x[0]
+            temperature = x[1]
+            footcandle = x[2]
+            moisture = x[3]
+            lampstatus = 0 if (x[4] == '1') else 1
+            fanstatus = 0 if (x[5] == '1') else 1
+            pumpstatus = x[6]
+            autolamp = x[7]
+            autofan = x[8]
+            autopump = x[9]
 
     footcandleArray = []
     humidityArray = []
@@ -214,7 +247,7 @@ def dashboard():
 
 @app.route('/api/get-data', methods=['POST', 'GET'])
 def get_data():
-    global thread_started
+    # global thread_started
     global humidity
     global temperature
     global footcandle
@@ -226,31 +259,33 @@ def get_data():
     global autofan
     global autopump
 
-    mycursor = mydb.cursor()
+    # mycursor = mydb.cursor()
 
-    if(thread_started == False):
-        thread_started = True
-        thread2 = threading.Thread(
-            target=save_data_to_database, args=(mycursor,))
+    # if(thread_started == False):
+    #     thread_started = True
+    #     thread2 = threading.Thread(
+    #         target=save_data_to_database, args=(mycursor,))
 
-        thread2.start()
+    #     thread2.start()
+    thread_start()
+    if ser.in_waiting:
 
-    # set default value of 0 to the variable below
-    line = ser.readline().decode('utf-8').rstrip()
-    ser.reset_input_buffer()
-    x = line.split("|")
+        # set default value of 0 to the variable below
+        line = ser.readline().decode('utf-8').rstrip()
+        ser.reset_input_buffer()
+        x = line.split("|")
 
-    if(len(x) == 10):
-        humidity = x[0]
-        temperature = x[1]
-        footcandle = x[2]
-        moisture = x[3]
-        lampstatus = 0 if (x[4] == '1') else 1
-        fanstatus = 0 if (x[5] == '1') else 1
-        pumpstatus = x[6]
-        autolamp = x[7]
-        autofan = x[8]
-        autopump = x[9]
+        if(len(x) == 10):
+            humidity = x[0]
+            temperature = x[1]
+            footcandle = x[2]
+            moisture = x[3]
+            lampstatus = 0 if (x[4] == '1') else 1
+            fanstatus = 0 if (x[5] == '1') else 1
+            pumpstatus = x[6]
+            autolamp = x[7]
+            autofan = x[8]
+            autopump = x[9]
 
     data = [humidity, temperature, footcandle, moisture, lampstatus,
             fanstatus, autolamp, autofan, autopump]
@@ -306,11 +341,6 @@ def setting():
         while len(temparray[i]) < 3:
             temparray[i] = "0" + temparray[i]
 
-        # print(temparray[i])
-    # print(preferredTemperature)
-    # print(preferredMoisture)
-    # print(preferredLight)
-
     print("20"+temparray[0]+temparray[1] +
           temparray[2]+temparray[3])
 
@@ -320,53 +350,47 @@ def setting():
     return redirect('/dashboard')
 
 
-def save_data_to_database(mycursor):
+def save_data_to_database():
 
     while 1:
-        # print("Looking for data from arduino...")
-        line = ser.readline().decode('utf-8').rstrip()
-        ser.reset_input_buffer()
-        # line = "asd"
-        print("Line = " + line)
-        # separate the string into list
-        x = line.split("|")
-        if(len(x) == 1):
-            pass
-        else:
-            try:
-                humidity = int(float(x[0]))
-                temperature = float(x[1])
-                footcandle = float(x[2])
-                moisture = float(x[3])
-                lampstatus = bool(0 if (x[4] == '1') else 1)
-                fanstatus = bool(0 if (x[5] == '1') else 1)
-                pumpstatus = bool(x[6])
+        mydb.reconnect()
+        mycursor = mydb.cursor()
+        if ser.in_waiting:  # Or: if serialport.inWaiting():
+            line = ser.readline().decode('utf-8').rstrip()
+            ser.reset_input_buffer()
+            print("Line = " + line)
+            x = line.split("|")
 
-                # print(humidity, temperature, footcandle,moisture, lampstatus, fanstatus, pumpstatus)
+            if(len(x) == 1):
+                pass
+            else:
+                try:
+                    humidity = int(float(x[0]))
+                    temperature = float(x[1])
+                    footcandle = float(x[2])
+                    moisture = int(x[3])
+                    lampstatus = bool(0 if (x[4] == '1') else 1)
+                    fanstatus = bool(0 if (x[5] == '1') else 1)
+                    pumpstatus = bool(x[6])
 
-                # with mydb:
-                # print("ready to execute")
-                mycursor.execute(
-                    "INSERT INTO monitoring_data (`id`,`timestamp`,`footcandle`,`moisture`,`humidity`,`temperature`) VALUES (NULL,DEFAULT,{0},{1},{2},{3})".format(footcandle, moisture, humidity, temperature))
+                    mycursor.execute(
+                        "INSERT INTO monitoring_data (`id`,`timestamp`,`footcandle`,`moisture`,`humidity`,`temperature`) VALUES (NULL,DEFAULT,{0},{1},{2},{3})".format(footcandle, moisture, humidity, temperature))
 
-                mycursor.execute(
-                    "INSERT INTO lamp_toggle (`id`, `timestamp`, `lamp_status`) VALUES (NULL,DEFAULT,{0})".format(lampstatus))
+                    mycursor.execute(
+                        "INSERT INTO lamp_toggle (`id`, `timestamp`, `lamp_status`) VALUES (NULL,DEFAULT,{0})".format(lampstatus))
 
-                mycursor.execute(
-                    "INSERT INTO `fan_toggle`(`id`, `timestamp`, `fan_status`) VALUES (NULL,DEFAULT,{0})".format(fanstatus))
+                    mycursor.execute(
+                        "INSERT INTO `fan_toggle`(`id`, `timestamp`, `fan_status`) VALUES (NULL,DEFAULT,{0})".format(fanstatus))
 
-                mycursor.execute(
-                    "INSERT INTO `pump_toggle`(`id`, `timestamp`, `pump_status`) VALUES (NULL,DEFAULT,{0})".format(pumpstatus))
+                    mycursor.execute(
+                        "INSERT INTO `pump_toggle`(`id`, `timestamp`, `pump_status`) VALUES (NULL,DEFAULT,{0})".format(pumpstatus))
 
-                mydb.commit()
+                    mycursor.close()
+                    mydb.commit()
 
-                # print("Upload to database...")
-
-                # mycursor.close()
-
-            except:
-                # print databaes error
-                print("Error")
+                except Error as e:
+                    print("Error: " + e)
+        mycursor.close()
         time.sleep(10)
 
 
